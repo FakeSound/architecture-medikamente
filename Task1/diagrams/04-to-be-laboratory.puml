@@ -1,0 +1,83 @@
+@startuml DFD_04_Laboratory_TO-BE
+title DFD 4: Работа лаборатории (анализы) (TO-BE)
+
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BackgroundColor<<ext>>  #DAE8FC
+  BorderColor<<ext>>      #6C8EBF
+  FontStyle<<ext>>        bold
+  BackgroundColor<<proc>> #D5E8D4
+  BorderColor<<proc>>     #82B366
+  BackgroundColor<<sec>>  #FFE6CC
+  BorderColor<<sec>>      #D79B00
+  FontStyle<<sec>>        bold
+}
+skinparam database {
+  BackgroundColor #FFF2CC
+  BorderColor     #D6B656
+}
+skinparam note {
+  BackgroundColor #EEF7EE
+  BorderColor     #82B366
+}
+skinparam arrow {
+  Color     #444444
+  FontSize  10
+  FontColor #444444
+}
+skinparam shadowing false
+
+' ── Акторы ──────────────────────────────────────
+rectangle "Пациент"   <<ext>> as PAT
+rectangle "Лаборант"  <<ext>> as LAB
+rectangle "Врач"      <<ext>> as DOC
+
+' ── Процессы ─────────────────────────────────────
+rectangle "4.1\nПриём направления\nна анализ"             <<proc>> as P41
+rectangle "4.2\nЗабор биоматериала\nи проведение анализа" <<proc>> as P42
+rectangle "4.3\nСохранение\nрезультатов"                  <<proc>> as P43
+rectangle "4.4\nВыдача результатов\nврачу и пациенту"     <<proc>> as P44
+
+' ── Сервис псевдонимизации ───────────────────────
+rectangle "Pseudonymization\nService\n(токен ↔ пациент)" <<sec>> as PSE
+
+' ── Хранилища данных ─────────────────────────────
+database "D7: Реестр анализов\nМИС · СУБД · TDE\n[MEDICAL]"        as D7
+database "D5: Медицинские карты\nМИС · СУБД · TDE\n[MEDICAL, PII]" as D5
+
+' ── Потоки данных ────────────────────────────────
+DOC --> P41 : Направление на анализ\n[PII, MEDICAL]
+PAT --> P41 : Подтверждение личности
+
+P41 --> PSE : ФИО пациента\n[PII]
+PSE --> P41 : Токен пациента
+
+P41 --> P42 : Токен · анализ\n🔒 без ФИО · 🔒 mTLS
+PAT --> P42 : Биоматериал (физически)
+LAB --> P42 : Проводит анализ
+
+P42 --> P43 : Результаты + токен\n[MEDICAL] · 🔒 mTLS
+P43 --> D7  : Запись в реестр\n[MEDICAL] · 🔒 Audit log
+P43 --> D5  : Привязка к медкарте\n[MEDICAL] · 🔒 Audit log
+
+D7  --> P44 : Данные результатов\n[MEDICAL] · 🔒 Audit log
+P44 --> PSE : Токен → детокенизация
+PSE --> P44 : ФИО пациента
+P44 --> DOC : Результаты\n[MEDICAL] · 🔒 ABAC
+P44 --> PAT : Результаты (только свои)\n[MEDICAL] · 🔒 ABAC
+
+' ── Меры безопасности ────────────────────────────
+note right of PSE
+  🔒 Лаборатория получает токен,
+  🔒 не ФИО пациента
+  🔒 Детокенизация только внутри МИС
+end note
+
+note right of D7
+  🔒 TDE — шифрование БД
+  🔒 ABAC: пациент — только свои
+  🔒 ABAC: врач — только своих пациентов
+  🔒 Audit log (read / write)
+end note
+
+@enduml

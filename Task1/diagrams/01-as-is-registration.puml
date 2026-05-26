@@ -1,0 +1,41 @@
+@startuml DFD_01_Registration
+title DFD 1: Запись на приём / Регистрация пациента
+
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BackgroundColor<<ext>>  #DAE8FC
+  BorderColor<<ext>>      #6C8EBF
+  FontStyle<<ext>>        bold
+  BackgroundColor<<proc>> #D5E8D4
+  BorderColor<<proc>>     #82B366
+}
+skinparam database {
+  BackgroundColor #FFF2CC
+  BorderColor     #D6B656
+}
+skinparam arrow {
+  Color     #444444
+  FontSize  10
+  FontColor #444444
+}
+skinparam shadowing false
+
+' ── Акторы ──────────────────────────────────────
+rectangle "Пациент"  <<ext>> as PAT
+rectangle "Ресепшн"  <<ext>> as REC
+rectangle "Врач"     <<ext>> as DOC
+
+' ── Хранилища данных ─────────────────────────────
+database "D1: Картотека пациентов\nExcel · файловый сервер"   as D1
+database "D2: Журнал записей (расписание)\nExcel · файловый сервер" as D2
+
+' ── Потоки данных ────────────────────────────────
+PAT --> REC : ФИО · дата рожд. · тел. · email
+PAT --> REC : Адрес · место работы\nхронич. заболевания
+
+REC --> D1 : Работа с карточкой\n[ПД/МД пациента]
+REC --> D2 : Работа с расписанием\n[ПД пациента/тип приема]
+
+DOC --> D2 : Понимание своего расписания\n[ПД пациента/тип приема]
+
+@enduml

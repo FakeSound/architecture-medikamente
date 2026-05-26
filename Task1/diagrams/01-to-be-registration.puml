@@ -1,0 +1,64 @@
+@startuml DFD_01_Registration_TO-BE
+title DFD 1: Запись на приём / Регистрация пациента (TO-BE)
+
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BackgroundColor<<ext>>  #DAE8FC
+  BorderColor<<ext>>      #6C8EBF
+  FontStyle<<ext>>        bold
+  BackgroundColor<<proc>> #D5E8D4
+  BorderColor<<proc>>     #82B366
+}
+skinparam database {
+  BackgroundColor #FFF2CC
+  BorderColor     #D6B656
+}
+skinparam note {
+  BackgroundColor #EEF7EE
+  BorderColor     #82B366
+}
+skinparam arrow {
+  Color     #444444
+  FontSize  10
+  FontColor #444444
+}
+skinparam shadowing false
+
+' ── Акторы ──────────────────────────────────────
+rectangle "Пациент"  <<ext>> as PAT
+rectangle "Ресепшн"  <<ext>> as REC
+rectangle "Врач"     <<ext>> as DOC
+
+' ── Хранилища данных ─────────────────────────────
+database "D1: Картотека пациентов\nМИС · СУБД · TDE\n[PII, MEDICAL]"   as D1
+database "D2: Журнал записей (расписание)\nМИС · СУБД · TDE\n[PII]" as D2
+
+' ── Потоки данных ────────────────────────────────
+PAT --> REC : ФИО · дата рожд. · тел. · email\n[PII] · 🔒 TLS 1.3
+PAT --> REC : Адрес · место работы\nхронич. заболевания\n[PII, MEDICAL] · 🔒 TLS 1.3
+
+REC --> D1 : Работа с карточкой\n[PII / MEDICAL] · 🔒 Audit log
+REC --> D2 : Работа с расписанием\n[PII] · 🔒 Audit log
+
+DOC --> D2 : Понимание своего расписания\n[PII] · 🔒 Audit log
+
+' ── Меры безопасности ────────────────────────────
+note right of D1
+  🔒 TDE — шифрование БД
+  🔒 Column-level: телефон, email
+  🔒 RBAC: только Ресепшн
+  🔒 Audit log (read / write)
+end note
+
+note right of D2
+  🔒 TDE — шифрование БД
+  🔒 RBAC: Ресепшн + Врач (только чтение)
+  🔒 Audit log (read / write)
+end note
+
+note bottom of REC
+  🔒 RBAC: роль Ресепшн
+  🔒 Реестр согласий пациентов
+end note
+
+@enduml

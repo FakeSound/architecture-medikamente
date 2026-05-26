@@ -1,0 +1,54 @@
+@startuml DFD_04_Laboratory
+title DFD 4: Работа лаборатории (анализы)
+
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BackgroundColor<<ext>>  #DAE8FC
+  BorderColor<<ext>>      #6C8EBF
+  FontStyle<<ext>>        bold
+  BackgroundColor<<proc>> #D5E8D4
+  BorderColor<<proc>>     #82B366
+}
+skinparam database {
+  BackgroundColor #FFF2CC
+  BorderColor     #D6B656
+}
+skinparam arrow {
+  Color     #444444
+  FontSize  10
+  FontColor #444444
+}
+skinparam shadowing false
+
+' ── Акторы ──────────────────────────────────────
+rectangle "Пациент"   <<ext>> as PAT
+rectangle "Лаборант"  <<ext>> as LAB
+rectangle "Врач"      <<ext>> as DOC
+
+' ── Процессы ─────────────────────────────────────
+rectangle "4.1\nПриём направления\nна анализ"              <<proc>> as P41
+rectangle "4.2\nЗабор биоматериала\nи проведение анализа"  <<proc>> as P42
+rectangle "4.3\nСохранение\nрезультатов"                   <<proc>> as P43
+rectangle "4.4\nВыдача результатов\nврачу и пациенту"      <<proc>> as P44
+
+' ── Хранилища данных ─────────────────────────────
+database "D7: Реестр анализов\nExcel · файловый сервер"          as D7
+database "D5: Медицинские карты\nPDF / JPG-сканы · файловый сервер" as D5
+
+' ── Потоки данных ────────────────────────────────
+DOC --> P41 : Направление на анализ
+PAT --> P41 : Подтверждение личности
+
+P41 --> P42 : Данные направления\n[ФИО, Анализ пациента]
+PAT --> P42 : Биоматериал (физически)
+LAB --> P42 : Проводит анализ
+
+P42 --> P43 : Результаты анализа\n[ФИО, Анализ пациента]
+P43 --> D7  : Запись в реестр анализов\n[запись]
+P43 --> D5  : Привязка к медкарте пациента\n[запись]
+
+D7  --> P44 : Данные результатов\n[чтение]
+P44 --> DOC : Результаты для просмотра
+P44 --> PAT : Результаты по запросу
+
+@enduml
