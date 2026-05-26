@@ -1,0 +1,61 @@
+@startuml
+!include <C4/C4_Container.puml>
+
+title Medikamente - Data Classification Platform (C2 Level Architecture)
+
+LAYOUT_LEFT_RIGHT()
+
+' ==================== ВНЕШНИЕ СУЩНОСТИ И АКТОРЫ ====================
+Person(securityEng, "Security Engineer", "Специалист по информационной безопасности")
+System_Ext(sourceSystems, "Source Systems", "Платформа автоматизации, внешняя лаборатория, legacy-источники")
+System_Ext(privacyLayer, "Privacy & Data Governance Layer", "Централизованный Data Catalog, реестр политик")
+System_Ext(auditLayer, "Security Monitoring & Audit", "Audit Log Service (Служба регистрации событий ИБ)")
+
+' ==================== ПЛАТФОРМА КЛАССИФИКАЦИИ ====================
+System_Boundary(classificationPlatform, "Data Classification Platform") {
+    Container(ingestion, "Ingestion Gateway", "Batch/API", "Прием входящих потоков данных из источников")
+    Container(rawLanding, "Raw Landing", "Object Storage (AES-256)", "Временное изолированное хранилище неклассифицированных данных")
+    Container(classifier, "Classification Engine", "On-Premise Service", "Автоматический анализ структур, назначение тегов безопасности, детекция изменений схем")
+    Container(policyDecision, "Policy Decision (OPA)", "Policy-as-Code Engine", "Валидация назначенных тегов на соответствие правилам маршрутизации")
+    Container(transform, "De-identification Service", "Vault Transform Engine", "Маскирование атрибутов PII, токенизация и агрегация данных MEDICAL")
+    Container(quarantine, "Quarantine", "Protected Storage", "Изоляция данных с низким уровнем достоверности автоматической классификации")
+}
+
+' ==================== АНАЛИТИЧЕСКОЕ ХРАНИЛИЩЕ ====================
+System_Boundary(analyticsPlatform, "Analytics Storage (ClickHouse)") {
+    Container(confidentialLayer, "Confidential Layer", "DWH Layer (TDE + RLS)", "Хранение размеченных данных с ограничением доступа на уровне строк по доменам")
+    Container(pseudonymizedLayer, "Pseudonymized Layer", "DWH Layer", "Основной аналитический слой (прямые идентификаторы PII заменены токенами)")
+    Container(publicMarts, "Public/Aggregated Marts", "Data Marts", "Деперсонализированные агрегированные витрины данных для BI-инструментов")
+}
+
+' ==================== НАПРАВЛЕНИЯ ПОТОКОВ ДАННЫХ ====================
+
+' Процесс первичного приема и анализа
+Rel(sourceSystems, ingestion, "Передача пакетов данных")
+Rel(ingestion, rawLanding, "Сохранение исходного состояния объектов")
+Rel(rawLanding, classifier, "Передача данных на процедуру сканирования")
+Rel(classifier, policyDecision, "Передача структуры и метаданных (тегов)")
+
+' Запрос управляющих политик (Governance)
+Rel(privacyLayer, classifier, "Синхронизация глобального справочника тегов")
+Rel(privacyLayer, policyDecision, "Поставка актуальных политик фильтрации")
+
+' Маршрутизация на основе решений Policy-as-Code
+Rel(policyDecision, transform, "Перенаправление верифицированных данных")
+Rel(policyDecision, quarantine, "Маршрутизация объектов для ручной проверки")
+
+' Наполнение слоев аналитического хранилища
+Rel(transform, confidentialLayer, "Запись замаскированных данных (Доступ: Администраторы/Архитекторы)")
+Rel(transform, pseudonymizedLayer, "Запись токенизированных данных (Доступ: Аналитики)")
+Rel(transform, publicMarts, "Запись агрегатов общего доступа (Доступ: BI-системы)")
+
+' Контур обратной связи и ручная модерация
+Rel(quarantine, securityEng, "Инициирование инцидента ручной верификации")
+Rel(securityEng, privacyLayer, "Модификация правил классификации в Data Catalog по результатам разбора")
+
+' Регистрация событий безопасности (Логирование)
+Rel(classifier, auditLayer, "Регистрация результатов сканирования и изменений структуры данных")
+Rel(policyDecision, auditLayer, "Регистрация транзакционных решений модуля OPA")
+Rel(securityEng, auditLayer, "Регистрация административных действий в карантинной зоне")
+
+@enduml

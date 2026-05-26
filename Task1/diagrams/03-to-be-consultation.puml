@@ -1,0 +1,73 @@
+@startuml DFD_03_MedConsultation_TO-BE
+title DFD 3: Приём пациента врачом (TO-BE)
+
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BackgroundColor<<ext>>  #DAE8FC
+  BorderColor<<ext>>      #6C8EBF
+  FontStyle<<ext>>        bold
+  BackgroundColor<<proc>> #D5E8D4
+  BorderColor<<proc>>     #82B366
+}
+skinparam database {
+  BackgroundColor #FFF2CC
+  BorderColor     #D6B656
+}
+skinparam note {
+  BackgroundColor #EEF7EE
+  BorderColor     #82B366
+}
+skinparam arrow {
+  Color     #444444
+  FontSize  10
+  FontColor #444444
+}
+skinparam shadowing false
+
+' ── Акторы ──────────────────────────────────────
+rectangle "Пациент"  <<ext>> as PAT
+rectangle "Врач"     <<ext>> as DOC
+
+' ── Процессы ─────────────────────────────────────
+rectangle "3.1\nИдентификация\nпациента"           <<proc>> as P31
+rectangle "3.2\nОсмотр и постановка\nдиагноза"     <<proc>> as P32
+rectangle "3.3\nОформление /\nобновление медкарты"  <<proc>> as P33
+rectangle "3.4\nВыдача назначений\nи направлений"   <<proc>> as P34
+
+' ── Хранилища данных ─────────────────────────────
+database "D1: Картотека пациентов\nМИС · СУБД · TDE\n[PII]"            as D1
+database "D5: Медицинские карты\nМИС · СУБД · TDE\n[MEDICAL, PII]"     as D5
+database "D2: Журнал приёма\nМИС · СУБД · TDE\n[PII]"                  as D2
+
+' ── Потоки данных ────────────────────────────────
+DOC --> P31 : Инициирует приём
+
+PAT --> P31 : ФИО\n[PII] · 🔒 TLS 1.3
+D1  --> P31 : Карточка пациента\n[PII] · 🔒 Audit log
+
+P31 --> P32 : Данные пациента + история\n[PII, MEDICAL] · 🔒 TLS 1.3
+D5  --> P32 : История болезни\n[MEDICAL] · 🔒 ABAC · 🔒 Audit log
+
+PAT --> P32 : Жалобы (устно)
+
+P32 --> P33 : Результаты осмотра · диагноз\n[MEDICAL]
+P33 --> D5  : Запись в медкарту\n[MEDICAL] · 🔒 Audit log
+P33 --> D2  : Запись в журнал приёма\n[PII] · 🔒 Audit log
+
+P32 --> P34 : Назначения · рецепты\n[MEDICAL]
+P34 --> PAT : Направление на анализы · рецепт\n🔒 токен пациента вместо ФИО
+
+' ── Меры безопасности ────────────────────────────
+note right of D5
+  🔒 TDE + column-level encryption
+  🔒 ABAC: врач видит только
+  🔒 своих пациентов
+  🔒 Audit log (read / write)
+end note
+
+note right of P32
+  🔒 ABAC: доступ только при наличии
+  🔒 активной записи врач–пациент
+end note
+
+@enduml

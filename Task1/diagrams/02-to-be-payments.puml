@@ -1,0 +1,71 @@
+@startuml DFD_02_Payments_TO-BE
+title DFD 2: Приём платежей (TO-BE)
+
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BackgroundColor<<ext>>  #DAE8FC
+  BorderColor<<ext>>      #6C8EBF
+  FontStyle<<ext>>        bold
+  BackgroundColor<<proc>> #D5E8D4
+  BorderColor<<proc>>     #82B366
+  BackgroundColor<<sys>>  #F8CECC
+  BorderColor<<sys>>      #B85450
+  FontStyle<<sys>>        bold
+}
+skinparam database {
+  BackgroundColor #FFF2CC
+  BorderColor     #D6B656
+}
+skinparam note {
+  BackgroundColor #EEF7EE
+  BorderColor     #82B366
+}
+skinparam arrow {
+  Color     #444444
+  FontSize  10
+  FontColor #444444
+}
+skinparam shadowing false
+
+' ── Акторы ──────────────────────────────────────
+rectangle "Пациент"    <<ext>> as PAT
+rectangle "Кассир"     <<ext>> as CAS
+rectangle "Бухгалтер"  <<ext>> as BOOK
+
+' ── Внешняя система ──────────────────────────────
+rectangle "ККМ\n(кассовый аппарат)"  <<sys>> as KKM
+
+' ── Процессы ─────────────────────────────────────
+rectangle "2.1\nПриём оплаты\nза услуги"        <<proc>> as P21
+rectangle "2.2\nФискализация\n(выдача чека)"     <<proc>> as P22
+rectangle "2.3\nУчёт платежа\nв 1С:Бухгалтерия" <<proc>> as P23
+
+' ── Хранилища данных ─────────────────────────────
+database "D4: 1С:Бухгалтерия\nСУБД · шифрование\n[FINANCIAL]" as D4
+
+' ── Потоки данных ────────────────────────────────
+PAT --> P21 : Оплата\nФИО и услуга для чека\n[PII, FINANCIAL] · 🔒 TLS 1.3
+CAS --> P21 : Инициирует кассовую операцию
+
+P21 --> P22 : Сумма · вид услуги · данные чека\n[FINANCIAL]
+P22 --> KKM : Команда фискализации\n🔒 зашифрованный канал
+KKM --> PAT : Кассовый чек (бумажный)
+
+P21 --> P23 : Данные платежа\n[FINANCIAL] · 🔒 TLS 1.3
+P23 --> D4  : Проводка\n[FINANCIAL] · 🔒 Audit log
+D4  --> BOOK: Бухгалтерские отчёты\n[FINANCIAL] · 🔒 Audit log
+
+' ── Меры безопасности ────────────────────────────
+note right of D4
+  🔒 TDE — шифрование БД
+  🔒 RBAC: Кассир (запись)
+  🔒 RBAC: Бухгалтер (чтение / отчёты)
+  🔒 Audit log (read / write)
+end note
+
+note bottom of P21
+  🔒 RBAC: только роль Кассир
+  🔒 Дублирующий учёт в Excel устранён
+end note
+
+@enduml

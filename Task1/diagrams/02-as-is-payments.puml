@@ -1,0 +1,59 @@
+@startuml DFD_02_Payments
+title DFD 2: Приём платежей
+
+skinparam defaultTextAlignment center
+skinparam rectangle {
+  BackgroundColor<<ext>>  #DAE8FC
+  BorderColor<<ext>>      #6C8EBF
+  FontStyle<<ext>>        bold
+  BackgroundColor<<proc>> #D5E8D4
+  BorderColor<<proc>>     #82B366
+  BackgroundColor<<sys>>  #F8CECC
+  BorderColor<<sys>>      #B85450
+  FontStyle<<sys>>        bold
+}
+skinparam database {
+  BackgroundColor #FFF2CC
+  BorderColor     #D6B656
+}
+skinparam arrow {
+  Color     #444444
+  FontSize  10
+  FontColor #444444
+}
+skinparam shadowing false
+
+' ── Акторы ──────────────────────────────────────
+rectangle "Пациент"    <<ext>> as PAT
+rectangle "Кассир"     <<ext>> as CAS
+rectangle "Бухгалтер"  <<ext>> as BOOK
+
+' ── Внешняя система ──────────────────────────────
+rectangle "ККМ\n(кассовый аппарат)"  <<sys>> as KKM
+
+' ── Процессы ─────────────────────────────────────
+rectangle "2.1\nПриём оплаты\nза услуги"              <<proc>> as P21
+rectangle "2.2\nФискализация\n(выдача чека)"           <<proc>> as P22
+rectangle "2.3\nУчёт платежа\nв 1С:Бухгалтерия"       <<proc>> as P23
+rectangle "2.4\nДублирующий учёт\nв Excel (вручную)"  <<proc>> as P24
+
+' ── Хранилища данных ─────────────────────────────
+database "D3: Журнал платежей\nExcel · файловый сервер"           as D3
+database "D4: 1С:Бухгалтерия предприятия\nФайловый режим · сервер" as D4
+
+' ── Потоки данных ────────────────────────────────
+PAT --> P21 : Оплата\nФИО и услуга для чека
+CAS --> P21 : Инициирует кассовую операцию
+
+P21 --> P22 : Сумма · вид услуги · данные чека
+P22 --> KKM : Команда фискализации (OLE/TCP)
+KKM --> PAT : Кассовый чек (бумажный)
+
+P21 --> P23 : Данные платежа
+P23 --> D4  : Проводка в 1С\n[запись]
+D4  --> BOOK: Бухгалтерские отчёты\n[чтение]
+
+CAS --> P24 : Параллельный ручной ввод
+P24 --> D3  : Запись в таблицу\n[запись]
+
+@enduml
